@@ -11,19 +11,21 @@ var _User2 = _interopRequireDefault(_User);
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
 class Player {
-  constructor({ id, name, ws, img }) {
+  constructor({ id, name, img }) {
     this.id = id;
     this.name = name;
-    this.ws = ws;
     this.img = img;
     this.score = 0;
+    this.index = -1;
+    this.offline = false;
   }
   playInfo() {
     return {
       id: this.id,
       name: this.name,
       img: this.img,
-      score: this.score
+      score: this.score,
+      offline: this.offline
     };
   }
 }

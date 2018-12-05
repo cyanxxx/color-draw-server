@@ -10,11 +10,15 @@ var _Player = require('./Player');
 
 var _Player2 = _interopRequireDefault(_Player);
 
+var _Constant = require('./Constant');
+
+var _DataService = require('./DataService');
+
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
-const Qs = require('../db/index');
-
 const TOTAL_ROUND = 3;
+
+const xss = require('xss');
 const TOTAL_TIME = 60;
 
 class Game {
@@ -24,31 +28,38 @@ class Game {
     this.roundImg = []; //每局画作
     this.room = room;
     this.round = 1;
+    this.status = _Constant.ROUND_READY;
+    this.subjects = {};
     this.currentRound = {
       key: "",
       tip: "",
       drawPlayer: null,
       currentIndex: 0,
       time: TOTAL_TIME,
-      isSend: false,
+      isTipSend: false,
       timer: null
     };
     this.scoreMap = [3, 2, 1];
-    userList.forEach(user => {
-      var player = new _Player2.default(user);
+    userList.forEach((ctrl, i) => {
+      var player = new _Player2.default(ctrl.user);
+      player.index = i;
       this.playerList.push(player);
     });
     this.currentRound.drawPlayer = this.playerList[this.currentRound.currentIndex];
   }
-
+  beginGame() {
+    if (this.status === _Constant.ROUND_READY) {
+      this.start();
+    }
+  }
   start() {
+    this.status = _Constant.ROUND_START;
     //拿词库数据
-    this.getData().then(() => {
-      //广播当前局数据
-      this.getGameData();
+    this.getSubjectData().then(() => {
+      this.broadCaastGameData();
     });
   }
-  getGameData() {
+  broadCaastGameData() {
     this.broadCastKey();
     this.timeCountDown();
   }
@@ -61,11 +72,14 @@ class Game {
   }
   nextRound() {
     //判断游戏是否结束
-    if (this.currentRound.currentIndex == this.playerList.length) {
+    //判断下一个存不存在
+    if (this.currentRound.currentIndex < this.playerList.length && this.playerList[this.currentRound.currentIndex].offline) {
+      this.currentRound.currentIndex++;
+    }
+    if (this.currentRound.currentIndex >= this.playerList.length) {
       if (this.round < TOTAL_ROUND) {
         this.currentRound.currentIndex = 0;
         this.round++;
-        console.log(this.round);
       } else {
         this.GameOver();
         return;
@@ -75,15 +89,15 @@ class Game {
     this.room.broadCast({}, 'reset');
     this.currentRound.drawPlayer = this.playerList[this.currentRound.currentIndex];
     this.currentRound.time = TOTAL_TIME;
-    this.isSend = false;
-    this.currentRound.isSend = false;
+    this.currentRound.isTipSend = false;
     this.roundMap = [];
     this.start();
   }
+  //整个房间广播题目
   broadCastKey() {
     var gameData = {
       currentPlayer: this.currentRound.drawPlayer.playInfo(),
-      status: 'start',
+      status: this.currentRound.status,
       playerList: this.infoPlayer()
     },
         playerData = _extends({}, gameData, { key: this.currentRound.key }),
@@ -96,8 +110,8 @@ class Game {
   timeCountDown() {
     if (this.currentRound.time > 0) {
       this.currentRound.time--;
-      if (!this.currentRound.isSend && this.currentRound.time <= TOTAL_TIME / 2) {
-        this.currentRound.isSend = true;
+      if (!this.currentRound.isTipSend && this.currentRound.time <= TOTAL_TIME / 2) {
+        this.currentRound.isTipSend = true;
         var tipData = this.currentRound.tip;
         this.room.broadCastToOther(tipData, 'getTip', this.currentRound.drawPlayer.id);
       }
@@ -109,46 +123,68 @@ class Game {
       }, 1000);
       this.room.broadCast(this.currentRound.time, 'timeOut');
     } else {
-      this.end();
+      this.roundFinsh();
     }
   }
 
-  getData() {
-    var rand = Math.random();
-    console.log(rand);
-    return new Promise((reslove, reject) => {
-      Qs.findOne({ random: { $gte: rand } }, function (err, result) {
-        console.log(result);
-        if (result == null) {
-          Qs.findOne({ random: { $lte: rand } }, function (err, result) {
-            reslove(result);
+  getSubjectData() {
+    return new Promise((resolve, reject) => {
+      (0, _DataService.getRandomSubject)().then(data => {
+        if (data == null || data.key in this.subjects) {
+          this.getSubjectData().then(() => {
+            resolve();
           });
         } else {
-          console.log(result);
-          reslove(result);
+          this.subjects[data.key] = data.tip;
+          this.currentRound.key = data.key;
+          this.currentRound.tip = data.tip;
+          resolve();
         }
       });
-    }).then(data => {
-      console.log(data);
-      this.currentRound.key = data.key;
-      this.currentRound.tip = data.tip;
     });
-    // if (result == null) {
-    //   result = Qs.findOne({random: { $lte: rand } })
-    // }
-    console.log(this.currentRound.key, this.currentRound.tip);
-    // if(result){
-    //   console.log(result)
-    //   this.currentRound.key = result.key
-    //   this.currentRound.tip = result.tip
-    // }
-
   }
-
+  //如果是玩家应该读取画作
+  userReconnect(player) {
+    player.offline = false;
+    var gameData = {
+      currentPlayer: this.currentRound.drawPlayer.playInfo(),
+      status: this.status,
+      playerList: this.infoPlayer()
+      //当前猜什么，剩多少秒，是不是画画人,其他人的积分
+    };if (this.currentRound.drawPlayer.id === player.id) {
+      var playerData = _extends({}, gameData, { key: this.currentRound.key });
+      this.room.tellOneUse(playerData, 'getGameData', player.id);
+    } else {
+      var guestData = _extends({}, gameData, { key: this.currentRound.key.length + "个字" });
+      if (this.currentRound.isTipSend) {
+        var tipData = this.currentRound.tip;
+        this.room.tellOneUse(tipData, 'getTip', player.id);
+      }
+      this.room.tellOneUse(guestData, 'getGameData', player.id);
+    }
+    this.room.broadCastToOther({ offlineId: player.id }, 'getImage', player.id);
+  }
+  getCurrentImg(data) {
+    this.room.tellOneUse(data, 'drawImage', data.offlineId);
+  }
   saveImg(data) {
     this.roundImg.push(data.dataUrl);
   }
-
+  allOnlinePlayer() {
+    return this.playerList.filter(player => {
+      return !player.offline;
+    });
+  }
+  findPlayer(id) {
+    return this.playerList.find(player => {
+      return player.id === id;
+    });
+  }
+  playerOffline(id) {
+    var offlinePlayer = this.findPlayer(id);
+    offlinePlayer.offline = true;
+    return offlinePlayer;
+  }
   checkAnswer(data, id) {
     var currentUser = null;
     //找当前发信息的用户
@@ -188,7 +224,8 @@ class Game {
         ans: { score: currentUser.score, id: currentUser.id }
       }, "getScore");
     } else {
-      this.room.broadCast(this.chat(data.ans, currentUser.name), "getcomMes");
+      var xssData = xss(data.ans);
+      this.room.broadCast(this.chat(xssData, currentUser.name), "getcomMes");
     }
   }
 
@@ -201,27 +238,27 @@ class Game {
   }
 
   isAllFinish() {
-    //除去画的那个
-    if (this.roundMap.length == this.playerList.length - 1) {
-      this.end();
+    //除去画的那个,有机会会上来所以还是不跳过
+    if (this.roundMap.length == this.allOnlinePlayer().length - 1) {
+      this.roundFinsh();
     }
   }
 
   GameOver() {
-    var data = { status: 'over', roundImgs: this.roundImg, playerList: this.infoPlayer() };
+    var data = { status: _Constant.GAME_OVER, roundImgs: this.roundImg, playerList: this.infoPlayer() };
     new Promise((res, rej) => {
       this.room.broadCast(data, 'gameOver', res);
     }).then(() => {
-      this.room.changeStatus('free');
+      this.room.gameOver();
     });
   }
 
-  end() {
+  roundFinsh() {
     clearTimeout(this.currentRound.timer);
     this.currentRound.timer = null;
     var data = {
       key: this.currentRound.key,
-      status: 'finish'
+      status: _Constant.ROUND_FINISH
     };
     this.room.broadCast(data, "roundFinish");
     this.currentRound.currentIndex++;
