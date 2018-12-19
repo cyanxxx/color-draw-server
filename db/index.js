@@ -7,7 +7,9 @@ var opts = {
   }
 };
 
-mongoose.connect(credentials.mongo.development.connectionString, opts);
+mongoose.connect(credentials.mongo.development.connectionString, {
+  useNewUrlParser: true
+});
 
 var qsSchema = mongoose.Schema({
   key: String,
@@ -19,27 +21,6 @@ var Qs = mongoose.model('Qs', qsSchema);
 
 Qs.find(function(err, qs){
   if(qs.length) return;
-
-  new Qs({
-    key: '源氏',
-    tip: '游戏人物',
-    random: Math.random()
-  }).save();
-  new Qs({
-    key: '我的英雄学院',
-    tip: '动画',
-    random: Math.random()
-  }).save()
-  new Qs({
-    key: '绝地求生',
-    tip: '游戏',
-    random: Math.random()
-  }).save()
-  new Qs({
-    key: '聚乙烯',
-    tip: '化学材料',
-    random: Math.random()
-  }).save()
   new Qs({
     key: '海绵宝宝',
     tip: '动画',
@@ -56,13 +37,13 @@ Qs.find(function(err, qs){
     random: Math.random()
   }).save()
   new Qs({
-    key: '爆豪胜己',
-    tip: '动画人物',
+    key: '防晒霜',
+    tip: '化妆用品',
     random: Math.random()
   }).save()
   new Qs({
-    key: '花街',
-    tip: '习俗地方',
+    key: '小提琴',
+    tip: '乐器',
     random: Math.random()
   }).save()
   new Qs({
@@ -71,24 +52,13 @@ Qs.find(function(err, qs){
     random: Math.random()
   }).save()
   new Qs({
-    key: '龙族',
-    tip: '小说',
-    random: Math.random()
-  }).save()
-
-  new Qs({
-    key: '康纳',
-    tip: '游戏人物',
-    random: Math.random()
-  }).save()
-  new Qs({
     key: '香蕉',
     tip: '水果',
     random: Math.random()
   }).save()
   new Qs({
-    key: '羽生结弦',
-    tip: '运动员',
+    key: '香肠',
+    tip: '食物',
     random: Math.random()
   }).save()
   new Qs({
@@ -97,28 +67,17 @@ Qs.find(function(err, qs){
     random: Math.random()
   }).save()
   new Qs({
-    key: '钢之炼金术师',
-    tip: '动画',
+    key: '书桌',
+    tip: '家具',
     random: Math.random()
   }).save()
-
   new Qs({
     key: '熊猫',
     tip: '动物',
     random: Math.random()
   }).save()
   new Qs({
-    key: '泰拳',
-    tip: '拳击',
-    random: Math.random()
-  }).save()
-  new Qs({
-    key: '消音器',
-    tip: '装备',
-    random: Math.random()
-  }).save()
-  new Qs({
-    key: '广场舞',
+    key: '棒球',
     tip: '运动',
     random: Math.random()
   }).save()
@@ -133,6 +92,11 @@ Qs.find(function(err, qs){
     random: Math.random()
   }).save()
   new Qs({
+    key: '彩虹屁',
+    tip: '网络词汇',
+    random: Math.random()
+  }).save()
+  new Qs({
     key: '显微镜',
     tip: '仪器',
     random: Math.random()
@@ -142,22 +106,6 @@ Qs.find(function(err, qs){
     tip: '交通工具',
     random: Math.random()
   }).save()
-  new Qs({
-    key: '吴彦祖',
-    tip: '人物',
-    random: Math.random()
-  }).save()
-  new Qs({
-    key: '普京',
-    tip: '人物',
-    random: Math.random()
-  }).save()
-
-  new Qs({
-    key: '你画我猜',
-    tip: '游戏',
-    random: Math.random()
-  }).save()
 })
 
-module.exports = Qs;
+// module.exports = Qs;
